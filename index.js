@@ -113,7 +113,7 @@ app.use(express.static(__dirname + "/public"));
 // routes
 
 app.get('/', (req, res, next) => {
-    res.render('landing.ejs')
+    res.redirect('/Home')
     next();
 })
 
@@ -128,64 +128,69 @@ app.get('/Home', (req, res) => {
 
 app.get('/Main', IsAuthenticated, async (req, res) => {
     console.log(req.url)
+    const connection = await createConnection()
+    const query = `select r.name
+        from user as u
+        join room_user as ru using(user_id)
+        join room as r using(room_id)
+        where username = ?; `
+    
+    const [groups] = await connection.query(query, req.session.username)
+
+    console.log(groups)
 
     res.render('main.ejs',
         {
-            username: req.session.username,
-            image0: "image0.png",
-            image1: "image1.png",
-            image2: "image2.png",
-
-
+            username: req.session.username, groups   
         })
 })
 
-app.get('/SignUp', (req, res) => {
-    res.render('signup.ejs', {
-        message: "Please sign up"
-    }
-    )
-})
+// app.get('/SignUp', (req, res) => {
+//     res.render('signup.ejs', {
+//         message: "Please sign up"
+//     }
+//     )
+// })
 
-app.post('/SignUp', async (req, res) => {
+// app.post('/SignUp', async (req, res) => {
 
-    const { username, password } = req.body;
-    const checkLetter = /[a-zA-Z]+$/;
-    if (!username.match(checkLetter)) {
-        console.log("username must contain only letters")
-        return res.render('signup.ejs', {
-            message: "username must contain only letters no special characters or numbers"
-        });
-    }
-    if (password.length < 8) {
-        console.log("password must be at least 8 characters long")
-        return res.render('signup.ejs', {
-            message: "password must be at least 8 characters long"
-        });
-    }
+//     const { username, password } = req.body;
+//     const checkLetter = /[a-zA-Z]+$/;
+//     if (!username.match(checkLetter)) {
+//         console.log("username must contain only letters")
+//         return res.render('signup.ejs', {
+//             message: "username must contain only letters no special characters or numbers"
+//         });
+//     }
+//     if (password.length < 8) {
+//         console.log("password must be at least 8 characters long")
+//         return res.render('signup.ejs', {
+//             message: "password must be at least 8 characters long"
+//         });
+//     }
 
-    try {
-        const connection = await createConnection();
-        const query = `SELECT * FROM user WHERE username = ?`;
-        const [result] = await connection.query(query, [username])
-        connection.end()
-        if (result.length > 0) {
-            console.log("username already exists");
-            return res.render('signup.ejs', {
-                message: "This username already exists try another one"
-            });
-        }
-    } catch (error) {
-        console.log(error);
-    }
+//     try {
+//         const connection = await createConnection();
+//         const query = `SELECT * FROM user WHERE username = ?`;
+//         const [result] = await connection.query(query, [username])
+//         connection.end()
+//         if (result.length > 0) {
+//             console.log("username already exists");
+//             return res.render('signup.ejs', {
+//                 message: "This username already exists try another one"
+//             });
+//         }
+//     } catch (error) {
+//         console.log(error);
+//     }
 
-    const hashedPassword = await bcrypt.hash(password, saltRounds)
-    const query = `INSERT INTO user (username, password) VALUES (?, ?)`
-    const connection = await createConnection();
-    const [result] = await connection.query(query, [username, hashedPassword]);
-    res.redirect('/Login');
-    console.log(result);
-})
+//     const hashedPassword = await bcrypt.hash(password, saltRounds)
+//     const query = `INSERT INTO user (username, password) VALUES (?, ?)`
+//     const connection = await createConnection();
+//     const [result] = await connection.query(query, [username, hashedPassword]);
+//     res.redirect('/Login');
+//     console.log(result);
+// })
 
 app.get('/Login', (req, res) => {
     res.render('login.ejs',
@@ -236,13 +241,13 @@ async function showTable() {
 
 app.post('/Login', async (req, res) => {
     const { username, password } = req.body
-    const checkLetter = /[a-zA-Z]+$/
-    if (!username.match(checkLetter)) {
-        console.log("username must contain only letters")
-        return res.render('login.ejs', {
-            message: "username must contain only letters"
-        });
-    }
+    // const checkLetter = /[a-zA-Z]+$/
+    // if (!username.match(checkLetter)) {
+    //     console.log("username must contain only letters")
+    //     return res.render('login.ejs', {
+    //         message: "username must contain only letters"
+    //     });
+    // }
     try {
         const connection = await createConnection()
         const query = `SELECT * FROM user WHERE username = ?`
@@ -256,7 +261,10 @@ app.post('/Login', async (req, res) => {
         }
 
         const user = result[0];
-        const passwordMatch = await bcrypt.compare(password, user.password)
+        // const passwordMatch = await bcrypt.compare(password, user.password)
+
+        const passwordMatch = (user.password_hash === password)
+
         if (!passwordMatch) {
             return res.render('login.ejs', {
                 message: "Invalid username or password"

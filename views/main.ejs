@@ -1,20 +1,25 @@
 <%- include('templates/header.ejs') %>
 
-<div class="flex flex-col gap-5 justify-center items-center p-5 text-blue-700 ">
-    <div>
-        <h1 class="text-5xl self-center">Members only.%>
-        </h1>
-    </div>
+<div class="flex flex-col gap-5 justify-center items-center p-5 text-blue-700 border-4 border-red-200 border-solid">
+
     <div>
         <h1 class="text-3xl self-center">Hello, <%= username %>
         </h1>
     </div>
-    <div class="flex flex-wrap gap-11">
+    <div class="flex flex-wrap gap-20 justify-center items-center border-4 border-blue-200 border-solid">
 
-        <img src="/<%= image0 %>" style="width: 250px;" alt="">
-        <img src="/<%= image1 %>" style="width: 250px;" alt="">
-        <img src="/<%= image2 %>" style="width: 250px;" alt="">
+        <div class="border-4 border-red-200 border-solid">
+            <% for (let i=0; i < groups.length; i++) { %>
+                <li>
+                <a href="/Main/<% groups[i].name %>"><%= groups[i].name %></a>
+                </li> 
+            <% } %>
+           
+        </div>
 
+        <div class="border-4 border-red-200 border-solid">
+            That
+        </div>
 
     </div>
 </div>
