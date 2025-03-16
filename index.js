@@ -35,6 +35,7 @@ const expirytime = 60 * 60 * 1000// (milliseconds * sec * min) 1 hour
 const mysql = require("mysql2/promise")
 const { group } = require('console')
 const { rootCertificates } = require('tls')
+const { promise } = require('bcrypt/promises')
 // const { trace } = require('console')
 async function createConnection() {
     return await mysql.createConnection({
@@ -111,8 +112,9 @@ function IsAuthenticated(req, res, next) {
     }
 }
 
-app.use(express.static(__dirname + "/public"));
-
+app.use(express.static("/public" + __dirname ));
+app.use(express.static('public'));
+app.use(express.json());
 
 
 // routes
@@ -169,7 +171,7 @@ async function getRoomUserId(username, groupName) {
     join user as u using(user_id)
     where u.username = ? and r.name = ?; `
     const [roomuseridlist] = await connection.query(query, [username, groupName])
-    console.log("ruID:",roomuseridlist)
+    console.log("ruID:", roomuseridlist)
     let roomuserid = roomuseridlist[0].room_user_id
     return roomuserid
 
@@ -208,14 +210,16 @@ async function getUnreadMessages(user_id) {
 async function getRoomId(groupName) {
     const connection = await createConnection()
     const query = `
-    select r.room_id
-    from room as r
-    where r.name = ?;`
+    select room_id
+    from room
+    where name = ?;`
     let [room_id] = await connection.query(query, [groupName])
-    
-    return room_id
-    
+
+    return room_id.length ? room_id[0] : null;
+
 }
+
+
 
 async function getLastReadMessageId(room_user_id) {
     const connection = await createConnection()
@@ -229,52 +233,62 @@ async function getLastReadMessageId(room_user_id) {
 
 }
 
-async function getUnreadMessagesCount(username, rooms) {
-    console.log(username, rooms)
-    
-    const unreadCount = []
-    const room_ids = []
+async function createNewChat(new_room_name) {
+    const connection = await createConnection();
 
-
-
-    for (const room of rooms) {
-        const [room_id] = await getRoomId(room.name)
-        console.log(room_id)
-        room_ids.push(room_id.room_id)
-    }
-
-    for (const room_id of room_ids) {
-        
-        console.log()
-       
-    }
-
-
-    console.log("unread count :", room_ids)
-    return unreadCount
+    // Step 1: Insert the new chat room into the room table
+    const query = `
+        INSERT INTO room (name)
+        VALUES (?);
+    `;
+    await connection.query(query, [new_room_name]);
+    console.log("Chat room created");
+    const new_room_id = await getRoomId(new_room_name)
+    return new_room_id
 }
+
+
+
+async function addUserToRoom(user_id, new_room_id) {
+    const connection = await createConnection();
+    
+
+    if (!new_room_id) {
+        console.error('Failed to get room ID')
+        return;
+    }
+
+    const query2 = `
+        INSERT INTO room_user (user_id, room_id)
+        VALUES (?, ?);
+    `;
+    await connection.query(query2, [user_id, new_room_id])
+
+    console.log("Chat room created and user added to the room")
+}
+
+
 
 
 
 app.get('/Main/*', IsAuthenticated, async (req, res) => {
     console.log(req.url)
     const [rooms] = await getRooms(req.session.username)
-    for (const room of rooms){
+    for (const room of rooms) {
         room.unreadCount = 0
     }
 
-    console.log("groups: ",rooms)
+    console.log("groups: ", rooms)
     const groupName = req.params[0]
     let [messages] = await getMessages(groupName)
     if (groupName != false) {
 
         console.log("groupName =", groupName)
-        
+
         let room_user_id = await getRoomUserId(req.session.username, groupName)
         let [last_message_id] = await getLastReadMessageId(room_user_id)
         console.log("last mes ID =", last_message_id)
         last_message_id = last_message_id.last_read_message_id
-
         messages.forEach(message => {
             // console.log(message.message_id)
             if (message.message_id <= last_message_id) {
@@ -289,51 +303,116 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
             }
 
         })
-    
-        
-        const [room_id] = await getRoomId(groupName)
-        console.log("room ID =",room_id)
+
+        const room_id = await getRoomId(groupName)
+        console.log("room ID =", room_id)
         updatelastreadmessage(last_message_id, room_user_id)
-        
-    } 
+
+    }
 
     let [unreadMessages] = await getUnreadMessages(req.session.user_id)
     console.log("unread mes = ", unreadMessages)
 
     for (unread of unreadMessages) {
-        for (const room of rooms){
+        for (const room of rooms) {
             if (unread.name == room.name) {
                 room.unreadCount = unread.unread_message_count
             }
-
         }
-
-        
-        
-
     }
     console.log(rooms)
 
+
+
+
     res.render('main.ejs', { rooms, groupName, messages })
-    
+
 })
 
+// Separate route for creating a new chat room
+// app.post('/Main/createNewChat', async (req, res) => {
+//     console.log('Full request body:', req.body);
+
+//     const { newChatName } = req.body;
+//     console.log('Extracted new chat name:', newChatName);
+
+//     if (!newChatName) {
+//         return res.status(400).json({ message: 'Chat room name is required' });
+//     }
+
+//     try {
+//         await createNewChat(newChatName);
+//         console.log('Chat room created:', newChatName);
+
+//         return res.status(200).json({ message: 'Chat room created successfully' });
+//     } catch (error) {
+//         console.error('Error creating chat room:', error);
+//         return res.status(500).json({ message: 'Internal Server Error' });
+//     }
+// });
+
+app.post('/Main/createNewChat', async (req, res) => {
+    try {
+        // console.log('Full request body:', req.body);
+
+        const { newChatName } = req.body;
+        console.log('Extracted new chat name:', newChatName);
+
+        if (!newChatName) {
+            console.error('No chat room name provided');
+            return res.status(400).json({ message: 'Chat room name is required' });
+        }
+
+        const room_id_new = await createNewChat(newChatName) 
+        let user_id = req.session.user_id
+        console.log(user_id)
+        console.log("new room id =",room_id_new.room_id)
+
+        setTimeout(() => addUserToRoom(user_id, room_id_new.room_id), 1000);
 
 
-app.post('/Main/*', async (req, res) => {
-    var sendmessage = req.body.message
-    var groupName = req.params[0]
-    const username = req.session.username
-    console.log(sendmessage)
-    console.log(groupName)
-    if (groupName != false) {
-        const room_user_id = await getRoomUserId(username, groupName)
-        console.log(room_user_id)
-        await newMessage(room_user_id, sendmessage)
-        res.redirect('/Main/' + groupName)
+        console.log('Chat room created:', newChatName);
+        return res.status(200).json({ message: 'Chat room created successfully' });
+
+    } catch (error) {
+        console.error('Error creating chat room:', error.message);
+        return res.status(500).json({ message: 'Internal Server Error' });
     }
 
-})
+
+
+
+});
+
+
+
+
+// Route for sending messages
+app.post('/Main/:groupName', async (req, res) => {
+    const sendmessage = req.body.message;
+    const groupName = req.params.groupName;
+    const username = req.session.username;
+
+    if (sendmessage) {
+        try {
+            const room_user_id = await getRoomUserId(username, groupName);
+            console.log('Room user ID:', room_user_id);
+            await newMessage(room_user_id, sendmessage);
+            return res.redirect('/Main/' + groupName);
+        } catch (error) {
+            console.error('Error sending message:', error);
+            return res.status(500).json({ message: 'Failed to send message' });
+        }
+    }
+
+    return res.status(400).json({ message: 'Invalid message data' });
+});
+
+
+
+
+
+
 
 
 
