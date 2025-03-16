@@ -252,12 +252,10 @@ async function createNewChat(new_room_name) {
 async function addUserToRoom(user_id, new_room_id) {
     const connection = await createConnection();
     
-
     if (!new_room_id) {
         console.error('Failed to get room ID')
         return;
     }
-
     const query2 = `
         INSERT INTO room_user (user_id, room_id)
         VALUES (?, ?);
@@ -265,6 +263,20 @@ async function addUserToRoom(user_id, new_room_id) {
     await connection.query(query2, [user_id, new_room_id])
 
     console.log("Chat room created and user added to the room")
+}
+
+async function getUserId(username) {
+    const connection = await createConnection()
+    const query = `
+
+    SELECT user_id
+    FROM user
+    Where username = ?;
+   `
+    let [new_member_id] = await connection.query(query, [username])
+    return new_member_id
+
+    
 }
 
 
@@ -329,27 +341,6 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
 
 })
 
-// Separate route for creating a new chat room
-// app.post('/Main/createNewChat', async (req, res) => {
-//     console.log('Full request body:', req.body);
-
-//     const { newChatName } = req.body;
-//     console.log('Extracted new chat name:', newChatName);
-
-//     if (!newChatName) {
-//         return res.status(400).json({ message: 'Chat room name is required' });
-//     }
-
-//     try {
-//         await createNewChat(newChatName);
-//         console.log('Chat room created:', newChatName);
-
-//         return res.status(200).json({ message: 'Chat room created successfully' });
-//     } catch (error) {
-//         console.error('Error creating chat room:', error);
-//         return res.status(500).json({ message: 'Internal Server Error' });
-//     }
-// });
 
 app.post('/Main/createNewChat', async (req, res) => {
     try {
@@ -379,10 +370,48 @@ app.post('/Main/createNewChat', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error' });
     }
 
+});
+
+app.post('/Main/addNewMember', async (req, res) => {
+    try {
+        console.log('Full request body:', req.body);
+
+        const { newMemberName, groupName } = req.body;
+        console.log('Extracted new member name:', newMemberName);
+        console.log('Extracted group name:', groupName);
+
+        if (!newMemberName) {
+            console.error('No newMemberName provided');
+            return res.status(400).json({ message: 'newMemberName is required' });
+        }
+
+        const [member_id] = await getUserId(newMemberName)
+        // nothingspecial
+
+        const room_id = await getRoomId(groupName)
+        console.log("memID", member_id)
+        console.log("roomID",room_id)
+
+        if (!member_id || !room_id) {
+            return res.status(404).json({ message: 'Member or room not found' });
+        }
+
+        // console.log("new room id =", room_id_new.room_id)
+
+        setTimeout(() => addUserToRoom(member_id.user_id, room_id.room_id), 1000);
 
 
+        console.log('newMember added:', newMemberName);
+        return res.status(200).json({ message: 'newMember added successfully' });
+
+    } catch (error) {
+        console.error('Error adding member:', error.message);
+        return res.status(500).json({ message: 'Internal Server Error' });
+    }
 
 });
+
+
 
 
 
