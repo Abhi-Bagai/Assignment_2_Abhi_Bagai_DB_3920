@@ -53,41 +53,78 @@
 
         }
 
+        /* Modal Styling */
         .modal {
             display: none;
             position: fixed;
-            z-index: 1;
-            left: 0;
             top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            overflow: auto;
-            background-color: rgb(0, 0, 0);
-            background-color: rgba(0, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
             padding-top: 60px;
+            /* Keeping the original spacing */
+            z-index: 10;
+            /* Ensure modal is on top */
         }
 
+        /* Modal Content Styling */
         .modal-content {
-            background-color: #fefefe;
+            background: #fff;
             margin: 5% auto;
             padding: 20px;
             border: 1px solid #888;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             width: 20%;
             height: auto;
+            animation: slide-down 0.3s ease-out forwards;
         }
 
+        /* Hidden state for smooth fade-in/out */
+        .hidden {
+            display: flex;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Show modal smoothly */
+        .modal.show {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Slide-down animation effect */
+        @keyframes slide-down {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Close button styling */
         .close {
+            cursor: pointer;
             color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 24px;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            transition: color 0.3s ease;
         }
 
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
+        .close:hover {
+            color: #555;
         }
     </style>
 

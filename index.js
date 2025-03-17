@@ -248,22 +248,65 @@ async function createNewChat(new_room_name) {
 }
 
 
-
 async function addUserToRoom(user_id, new_room_id) {
     const connection = await createConnection();
-    
-    if (!new_room_id) {
-        console.error('Failed to get room ID')
-        return;
-    }
-    const query2 = `
-        INSERT INTO room_user (user_id, room_id)
-        VALUES (?, ?);
-    `;
-    await connection.query(query2, [user_id, new_room_id])
 
-    console.log("Chat room created and user added to the room")
+    try {
+        // Step 1: Check if the user is already in the room
+        const checkQuery = `
+            SELECT * FROM room_user 
+            WHERE user_id = ? AND room_id = ?;
+        `;
+        const [rows] = await connection.execute(checkQuery, [user_id, new_room_id]);
+
+        // If user already exists in the room, don't add them again
+        if (rows.length > 0) {
+            console.log(`User ID ${user_id} is already in room ID ${new_room_id}`);
+            return;
+        }
+
+        // Step 2: If user is not in the room, insert them
+        const insertQuery = `
+            INSERT INTO room_user (user_id, room_id)
+            VALUES (?, ?);
+        `;
+        await connection.execute(insertQuery, [user_id, new_room_id]);
+
+        console.log(`User ID ${user_id} added to room ID ${new_room_id}`);
+    } catch (error) {
+        console.error("Error adding user to room:", error.message);
+    } finally {
+        // Ensure the connection is closed after operation
+        connection.end();
+    }
 }
+
+
+
+async function getUserInGroup( room_id) {
+    const connection = await createConnection();
+    
+    console.log(room_id)
+
+    // Step 1: Check if the user is already in the room
+    const checkQuery = `
+        SELECT * 
+        FROM room_user as ru
+        join user as u using(user_id)
+        WHERE ru.room_id = ?;
+    `;
+    const [rows] = await connection.query(checkQuery, [ room_id]);
+
+    // If user already exists in the room, don't add them again
+    return rows
+
+
+
+
+  
+}
+
+
 
 async function getUserId(username) {
     const connection = await createConnection()
@@ -274,10 +317,26 @@ async function getUserId(username) {
     Where username = ?;
    `
     let [new_member_id] = await connection.query(query, [username])
-    return new_member_id
-
-    
+    return new_member_id  
 }
+
+async function getUsers() {
+   
+    const connection = await createConnection()
+    const query = `
+    Select username
+    from user;;
+   `
+    let [userList] = await connection.query(query)
+
+    console.log(userList)
+    return userList 
+}
+
+async function updateUserInRoom(room_id, selectedUsernames) {
+   
+}
+
 
 
 
@@ -293,6 +352,8 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
     console.log("groups: ", rooms)
     const groupName = req.params[0]
     let [messages] = await getMessages(groupName)
+
+    let usernames_in_room = []
     if (groupName != false) {
 
         console.log("groupName =", groupName)
@@ -320,6 +381,14 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
         console.log("room ID =", room_id)
         updatelastreadmessage(last_message_id, room_user_id)
 
+        var users_in_room = await getUserInGroup(room_id.room_id);
+
+        // Use map to create an array of usernames
+        usernames_in_room = users_in_room.map(user => user.username);
+
+        console.log('usernames:', usernames_in_room);
+
+
     }
 
     let [unreadMessages] = await getUnreadMessages(req.session.user_id)
@@ -333,18 +402,17 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
         }
     }
     console.log(rooms)
+    const users = await getUsers();
+    // console.log(users)
 
-
-
-
-    res.render('main.ejs', { rooms, groupName, messages })
+    res.render('main.ejs', { rooms, groupName, messages, users, usernames_in_room })
 
 })
 
 
 app.post('/Main/createNewChat', async (req, res) => {
     try {
-        // console.log('Full request body:', req.body);
+        console.log('Full request body:', req.body);
 
         const { newChatName } = req.body;
         console.log('Extracted new chat name:', newChatName);
@@ -372,44 +440,39 @@ app.post('/Main/createNewChat', async (req, res) => {
 
 });
 
-app.post('/Main/addNewMember', async (req, res) => {
+app.post("/Main/addNewMember", async (req, res) => {
     try {
-        console.log('Full request body:', req.body);
+        console.log("Full request body:", req.body);
 
-        const { newMemberName, groupName } = req.body;
-        console.log('Extracted new member name:', newMemberName);
-        console.log('Extracted group name:', groupName);
+        const { groupName, users } = req.body;
 
-        if (!newMemberName) {
-            console.error('No newMemberName provided');
-            return res.status(400).json({ message: 'newMemberName is required' });
+        if (!users || users.length === 0) {
+            console.error("No users provided");
+            return res.status(400).json({ message: "At least one user is required" });
         }
 
-        const [member_id] = await getUserId(newMemberName)
-        // nothingspecial
-
-        const room_id = await getRoomId(groupName)
-        console.log("memID", member_id)
-        console.log("roomID",room_id)
-
-        if (!member_id || !room_id) {
-            return res.status(404).json({ message: 'Member or room not found' });
-        }
-
-        // console.log("new room id =", room_id_new.room_id)
-
-        setTimeout(() => addUserToRoom(member_id.user_id, room_id.room_id), 1000);
+        var room_id = getRoomId(groupName)
+        console.log(room_id)
 
 
-        console.log('newMember added:', newMemberName);
-        return res.status(200).json({ message: 'newMember added successfully' });
 
+        
+        req.body.users.forEach(user => {
+            var user_id = getUserId(user)
+            console.log(user_id)
+            addUserToRoom(user_id,room_id)            
+        });
+
+        
+
+        console.log("New members added:", users);
+        return res.status(200).json({ message: "New members added successfully" });
     } catch (error) {
-        console.error('Error adding member:', error.message);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        console.error("Error adding members:", error.message);
+        return res.status(500).json({ message: "Internal Server Error" });
     }
-
 });
+
 
 
 
@@ -439,6 +502,15 @@ app.post('/Main/:groupName', async (req, res) => {
 
 
 
+app.post('/update-room', async (req, res) => {
+    const room_id = req.body.room_id;
+    const selectedUsernames = req.body.selectedUsers || []; // Get selected users (checked)
+
+    // Call function to update users in the room (add/remove users)
+    await updateUserInRoom(room_id, selectedUsernames);
+
+    res.redirect(`/Main/`);  // Redirect to the room page
+});
 
 
 

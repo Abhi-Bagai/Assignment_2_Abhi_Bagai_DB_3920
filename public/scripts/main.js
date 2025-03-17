@@ -55,66 +55,84 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+document.addEventListener("DOMContentLoaded", () => {
+    const addButton = document.getElementById("addButton");
+    const addMemberModal = document.getElementById("addMemberModal");
+    const closeMemModal = document.getElementById("closemembermodal");
+    const addMembers = document.getElementById("addMembers");
 
-document.addEventListener('DOMContentLoaded', () => {
-    const addButton = document.getElementById('addButton');
-    const addMemberModal = document.getElementById('addMemberModal');
-    const closeMemModal = document.getElementById('closemembermodal');
-    const addMember = document.getElementById('addMember');
+    // Open the modal with animation
+    const openModal = () => {
+        addMemberModal.classList.add("show");
+        addMemberModal.classList.remove("hidden");
+    };
 
-    // Open the modal
-    addButton.addEventListener('click', () => {
-        addMemberModal.style.display = 'flex';
+    // Close modal with animation
+    const closeModal = () => {
+        addMemberModal.classList.remove("show");
+        setTimeout(() => addMemberModal.classList.add("hidden"), 300); // Sync with CSS transition
+    };
+
+    // Event listeners for open/close
+    addButton.addEventListener("click", openModal);
+    closeMemModal.addEventListener("click", closeModal);
+
+    // Close on background click
+    window.addEventListener("click", (event) => {
+        if (event.target === addMemberModal) closeModal();
     });
 
-    // Close the modal
-    closeMemModal.addEventListener('click', () => {
-        addMemberModal.style.display = 'none';
-    });
-
-    // Close modal on background click
-    window.addEventListener('click', (event) => {
-        if (event.target === addMemberModal) {
-            addMemberModal.style.display = 'none';
-        }
-    });
-    
-
-    // Handle creating a new chat
-    addMember.addEventListener('click', async (event) => {
+    // Handle form submission
+    addMembers.addEventListener("click", async (event) => {
         event.preventDefault();
 
-        const newMemberName = document.getElementById('newMemberName').value.trim();
-        const groupName = document.getElementById('groupName').value.trim()
-        console.log("g  ", groupName)
+        const selectedUsers = Array.from(
+            document.querySelectorAll('input[name="selectedUsers"]:checked')
+        ).map((checkbox) => checkbox.value);
 
+        const groupName = document.getElementById("groupName").value.trim();
 
-
-        if (!newMemberName) {
-            alert('Member name cannot be empty!');
+        if (!groupName) {
+            alert("Group name is required!");
             return;
         }
 
+        if (selectedUsers.length === 0) {
+            alert("Please select at least one user!");
+            return;
+        }
+
+        // Show loading state
+        addMembers.innerText = "Adding...";
+        addMembers.disabled = true;
+
         try {
-            const response = await fetch('/Main/addNewMember/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ newMemberName, groupName }), // Ensure key matches backend
+            const response = await fetch("/Main/addNewMember", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    groupName,
+                    users: selectedUsers,
+                }),
             });
 
             const result = await response.json();
+
             if (response.ok) {
-                console.log('Chat room created:', result.message);
-                addMemberModal.style.display = 'none';
-                location.reload(); // Refresh to show the new chat
+                console.log("Users added:", result.message);
+                closeModal();
+                location.reload();
             } else {
-                console.error('Failed to create chat:', result.message);
-                alert('Error: ' + result.message);
+                console.error("Failed to add users:", result.message);
+                alert("Error: " + result.message);
             }
         } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to Add new member');
+            console.error("Error:", error);
+            alert("Failed to add users. Please try again later.");
+        } finally {
+            // Reset button state
+            addMembers.innerText = "Add Selected Users";
+            addMembers.disabled = false;
         }
     });
-
 });

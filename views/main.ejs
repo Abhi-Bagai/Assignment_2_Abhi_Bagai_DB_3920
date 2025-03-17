@@ -32,7 +32,7 @@
                         <% } %>
                 </div>
 
-                
+
 
                 <div id="newChatModal" class="modal hidden">
                     <div class="modal-content text-3xl gap-3">
@@ -40,7 +40,6 @@
                             New Chat
                             <span class="close">&times;</span>
                         </div>
-
 
                         <input type="text" name="newChatName" id="newChatName"
                             class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
@@ -63,34 +62,46 @@
             </div>
 
             <div class="flex-col  border-4 bg-gray-50 border-gray-200 rounded-lg border-solid w-[800px]">
-                <div class="flex justify-between p-5 rounded-lg border-4 border-gray-200 border-solid bg-gray-50 text-3xl font-bold">
-                    
-                    <h1 id=""><%= groupName %></h1>
+
+                <div
+                    class="flex justify-between p-5 rounded-lg border-4 border-gray-200 border-solid bg-gray-50 text-3xl font-bold">
+                    <h1 id="">
+                        <%= groupName %>
+                    </h1>
                     <input type="hidden" id="groupName" value="<%= groupName %>">
 
-                    <div id="addMemberModal" class="modal hidden">
+                    <div id="addMemberModal" class="modal hidden" role="dialog" aria-labelledby="modal-title"
+                        aria-hidden="true">
                         <div class="modal-content text-3xl gap-3">
                             <div>
-                                Add New Member to <%= groupName %>
-                                <span id="closemembermodal" class="close">&times;</span>
+                                <h2 id="modal-title">Add New Members to <%= groupName %>
+                                </h2>
+                                <span id="closemembermodal" class="close" aria-label="Close modal">&times;</span>
                             </div>
-                    
-                    
-                            <input type="text" name="" id="newMemberName"
-                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                placeholder="New Member Username" />
-                    
-                            <button type="submit" id="addMember"
-                                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-                                Add User
-                            </button>
+
+                            <form action="/update-room" method="POST">
+                                <div class="user-list">
+                                    <% users.forEach(function(user) { %>
+                                        <label class="block text-lg">
+                                            <input type="checkbox" name="selectedUsers" value="<%= user.username.trim() %>" class="mr-2" <% if
+                                                (usernames_in_room.includes(user.username)) { %>
+                                            checked
+                                            <% } %>
+                                                >
+                                                <%= user.username %>
+                                        </label>
+                                        <% }) %>
+                                </div>
+                                <button type="submit">Update Group</button>
+                            </form>
+
                         </div>
                     </div>
 
-                    <button id="addButton"  class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold text-l rounded-lg sm:w-auto px-4 py-2 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-                        +</button>
-
-
+                    <button id="addButton"
+                        class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold text-l rounded-lg sm:w-auto px-4 py-2 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                        +
+                    </button>
                 </div>
 
                 <% for (let i=0; i < messages.length; i++) { %>
@@ -143,7 +154,7 @@
                                         <% } %>
 
 
-                 <% } %>
+                                            <% } %>
                     </div>
                     <% } %>
 
