@@ -629,37 +629,33 @@ app.post('/Login', async (req, res) => {
     }
 
 
-    try {
-        const connection = await createConnection()
-        const query = `SELECT * FROM user WHERE username = ?`
-        const [result] = await connection.query(query, [username.trim()]);
-        connection.end()
-        if (result.length === 0) {
-            console.log("This User Does Not Exist")
-            return res.render('login.ejs', {
-                message: "This User Does Not Exist"
-            });
-        }
-
-        const user = result[0];
-        const passwordMatch = await bcrypt.compare(password, user.password_hash)
-
-        
-
-        if (!passwordMatch) {
-            return res.render('login.ejs', {
-                message: "Invalid username or password"
-            });
-        } else {
-            req.session.authenticated = true
-            req.session.username = user.username
-            req.session.user_id = user.user_id
-            res.redirect('/Main/');
-        }
-    } catch (err) {
-        console.log('Error executing query:', err)
-        res.status(500).send('Internal Server Error')
+    
+    const connection = await createConnection()
+    const query = `SELECT * FROM user WHERE username = ?`
+    const [result] = await connection.query(query, [username.trim()]);
+    connection.end()
+    if (result.length === 0) {
+        console.log("This User Does Not Exist")
+        return res.render('login.ejs', {
+            message: "This User Does Not Exist"
+        });
     }
+
+    const user = result[0];
+    const passwordMatch = await bcrypt.compare(password, user.password_hash)
+    
+
+    if (!passwordMatch) {
+        return res.render('login.ejs', {
+            message: "Invalid username or password"
+        });
+    } else {
+        req.session.authenticated = true
+        req.session.username = user.username
+        req.session.user_id = user.user_id
+        res.redirect('/Main/');
+    }
+
 
 })  
 
