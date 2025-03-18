@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt') // import bcrypt
 const ejs = require('ejs')
 app.set('view engine', 'ejs')
 const url = require('url')
+const joi = require("joi");
 
 
 // environment variables
@@ -112,7 +113,7 @@ function IsAuthenticated(req, res, next) {
     }
 }
 
-app.use(express.static("/public" + __dirname ));
+app.use(express.static("/public" + __dirname));
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -192,9 +193,11 @@ async function updatelastreadmessage(last_message, room_user_id) {
     const connection = await createConnection()
     const query = `
     UPDATE room_user 
-    SET last_read_message_id = ${last_message}
-    WHERE room_user_id = ${room_user_id};`
-    await connection.query(query)
+    SET last_read_message_id = ?
+    WHERE room_user_id = ?;
+    `;
+    await connection.query(query, [last_message, room_user_id]);
+
 
 }
 
@@ -283,9 +286,9 @@ async function addUserToRoom(user_id, new_room_id) {
 
 
 
-async function getUserInGroup( room_id) {
+async function getUserInGroup(room_id) {
     const connection = await createConnection();
-    
+
     console.log(room_id)
 
     // Step 1: Check if the user is already in the room
@@ -295,7 +298,7 @@ async function getUserInGroup( room_id) {
         join user as u using(user_id)
         WHERE ru.room_id = ?;
     `;
-    const [rows] = await connection.query(checkQuery, [ room_id]);
+    const [rows] = await connection.query(checkQuery, [room_id]);
 
     // If user already exists in the room, don't add them again
     return rows
@@ -303,7 +306,7 @@ async function getUserInGroup( room_id) {
 
 
 
-  
+
 }
 
 
@@ -317,11 +320,11 @@ async function getUserId(username) {
     Where username = ?;
    `
     let [new_member_id] = await connection.query(query, [username])
-    return new_member_id  
+    return new_member_id
 }
 
 async function getUsers() {
-   
+
     const connection = await createConnection()
     const query = `
     Select username
@@ -330,11 +333,34 @@ async function getUsers() {
     let [userList] = await connection.query(query)
 
     console.log(userList)
-    return userList 
+    return userList
 }
 
-async function updateUserInRoom(room_id, selectedUsernames) {
-   
+async function checkUserInRoom(user, room_id) {
+
+    const connection = await createConnection()
+    const query = `
+    select * from room_user
+    where user_id = ? and room_id = ?; 
+   `
+    const [row] = await connection.query(query, [user_id, room_id]);
+
+    // If user already exists in the room, don't add them again
+    if (row.length > 0) {
+        console.log(`User ID ${user_id} is already in room ID ${room_id}`);
+        return true;
+    }
+    return false
+}
+
+async function updateUserInRoom(user_id, room_id) {
+    const connection = await createConnection()
+    const query = `
+    INSERT INTO room_user (user_id, room_id)
+    VALUES (?, ?);
+   `
+    const [newUser] = await connection.query(query, [user_id, room_id]);
+    return newUser
 }
 
 
@@ -405,7 +431,10 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
     const users = await getUsers();
     // console.log(users)
 
-    res.render('main.ejs', { rooms, groupName, messages, users, usernames_in_room })
+    res.render('main.ejs', { rooms, groupName, messages,
+        users: users,
+        usernames_in_room: usernames_in_room || []  // Ensure it's never null
+        })
 
 })
 
@@ -422,12 +451,12 @@ app.post('/Main/createNewChat', async (req, res) => {
             return res.status(400).json({ message: 'Chat room name is required' });
         }
 
-        const room_id_new = await createNewChat(newChatName) 
+        const room_id_new = await createNewChat(newChatName)
         let user_id = req.session.user_id
         console.log(user_id)
-        console.log("new room id =",room_id_new.room_id)
+        console.log("new room id =", room_id_new.room_id)
 
-        setTimeout(() => addUserToRoom(user_id, room_id_new.room_id), 1000);
+        await addUserToRoom(user_id, room_id_new.room_id)
 
 
         console.log('Chat room created:', newChatName);
@@ -440,41 +469,59 @@ app.post('/Main/createNewChat', async (req, res) => {
 
 });
 
-app.post("/Main/addNewMember", async (req, res) => {
+app.post("/Main/updateMember", async (req, res) => {
     try {
         console.log("Full request body:", req.body);
 
         const { groupName, users } = req.body;
 
-        if (!users || users.length === 0) {
-            console.error("No users provided");
-            return res.status(400).json({ message: "At least one user is required" });
+        if (!groupName || !users || users.length === 0) {
+            console.error("Invalid data provided");
+            return res.status(400).json({ message: "Group name and users are required." });
         }
 
-        var room_id = getRoomId(groupName)
-        console.log(room_id)
+        console.log("Group Name:", groupName);
+        console.log("Users:", users);
+
+        const room_id = getRoomId(groupName);
+        if (!room_id) {
+            console.error("Group not found:", groupName);
+            return res.status(404).json({ message: "Group not found." });
+        }
+
+        console.log("Room ID:", room_id);
+
+        const addedUsers = [];
+        const skippedUsers = [];
+
+        for (let user of users) {
+            const room_id = await getRoomId(groupName);
+            const user_id = await getUserId(user);
+            if (await checkUserInRoom(user_id, room_id)) {
 
 
 
-        
-        req.body.users.forEach(user => {
-            var user_id = getUserId(user)
-            console.log(user_id)
-            addUserToRoom(user_id,room_id)            
+                console.log("User already in room:", user);
+                skippedUsers.push(user);
+            } else {
+                console.log("Adding user to room:", user);
+                addUserToRoom(user_id, room_id);
+                addedUsers.push(user);
+            }
+        }
+
+        console.log("New members added:", addedUsers);
+        return res.status(200).json({
+            message: "New members added successfully",
+            added: addedUsers,
+            skipped: skippedUsers,
         });
 
-        
-
-        console.log("New members added:", users);
-        return res.status(200).json({ message: "New members added successfully" });
     } catch (error) {
         console.error("Error adding members:", error.message);
         return res.status(500).json({ message: "Internal Server Error" });
     }
 });
-
-
-
 
 
 
@@ -502,68 +549,58 @@ app.post('/Main/:groupName', async (req, res) => {
 
 
 
-app.post('/update-room', async (req, res) => {
-    const room_id = req.body.room_id;
-    const selectedUsernames = req.body.selectedUsers || []; // Get selected users (checked)
-
-    // Call function to update users in the room (add/remove users)
-    await updateUserInRoom(room_id, selectedUsernames);
-
-    res.redirect(`/Main/`);  // Redirect to the room page
-});
 
 
 
 
+app.get('/SignUp', (req, res) => {
+    res.render('signup.ejs', {
+        message: "Please sign up"
+    }
+    )
+})
 
+app.post('/SignUp', async (req, res) => {
 
+    const { username, password } = req.body;
 
-// app.get('/SignUp', (req, res) => {
-//     res.render('signup.ejs', {
-//         message: "Please sign up"
-//     }
-//     )
-// })
+    const schema = joi.object({
+        username: joi.string().alphanum().min(3).max(30).required(),
+        password: joi.string().min(8).max(30).required()
+    })
 
-// app.post('/SignUp', async (req, res) => {
+    const validation = schema.validate(req.body)
 
-//     const { username, password } = req.body;
-//     const checkLetter = /[a-zA-Z]+$/;
-//     if (!username.match(checkLetter)) {
-//         console.log("username must contain only letters")
-//         return res.render('signup.ejs', {
-//             message: "username must contain only letters no special characters or numbers"
-//         });
-//     }
-//     if (password.length < 8) {
-//         console.log("password must be at least 8 characters long")
-//         return res.render('signup.ejs', {
-//             message: "password must be at least 8 characters long"
-//         });
-//     }
+    if (validation.error) {
+        console.log(validation.error + ' error')
+        res.redirect('/SignUp')
+        return
+    }
 
-//     try {
-//         const connection = await createConnection();
-//         const query = `SELECT * FROM user WHERE username = ?`;
-//         const [result] = await connection.query(query, [username])
-//         connection.end()
-//         if (result.length > 0) {
-//             console.log("username already exists");
-//             return res.render('signup.ejs', {
-//                 message: "This username already exists try another one"
-//             });
-//         }
-//     } catch (error) {
-//         console.log(error);
-//     }
+  
 
-//     const hashedPassword = await bcrypt.hash(password, saltRounds)
-//     const query = `INSERT INTO user (username, password) VALUES (?, ?)`
-//     const connection = await createConnection();
-//     const [result] = await connection.query(query, [username, hashedPassword]);
-//     res.redirect('/Login');
-//     console.log(result);
-// })
+    try {
+        const connection = await createConnection();
+        const query = `SELECT * FROM user WHERE username = ?`;
+        const [result] = await connection.query(query, [username])
+        connection.end()
+        if (result.length > 0) {
+            console.log("username already exists");
+            return res.render('signup.ejs', {
+                message: "This username already exists try another one"
+            });
+        }
+    } catch (error) {
+        console.log(error);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, saltRounds)
+    const query = `INSERT INTO user (username, password_hash) VALUES (?, ?)`
+    const connection = await createConnection();
+    const [result] = await connection.query(query, [username.trim(), hashedPassword]);
+    res.redirect('/Login');
+    
+})
 
 app.get('/Login', (req, res) => {
     res.render('login.ejs',
@@ -575,56 +612,27 @@ app.get('/Login', (req, res) => {
 
 
 
-// async function createTable() {
-//     const connection = await createConnection()
-//     const query = `
-//     CREATE TABLE ${database}.\`user\` (
-//         \`user_id\` INT NOT NULL AUTO_INCREMENT,
-//         \`username\` VARCHAR(45) NOT NULL,
-//         \`password\` VARCHAR(100) NOT NULL,
-//         PRIMARY KEY (\`user_id\`),
-//         UNIQUE INDEX \`username_UNIQUE\` (\`username\` ASC) VISIBLE
-//     )`;
-//     try {
-//         const [result] = await connection.query(query)
-//         console.log("Table created successfully:", result)
-//     } catch (err) {
-//         console.error('Error creating table:', err)
-//     } finally {
-//         await connection.end()
-//     }
-// }
-
-// async function showTable() {
-//     const connection = await createConnection();
-//     const query = `select * from user`;
-//     try {
-//         const [result] = await connection.query(query);
-//         console.log("Table User:", result)
-//     } catch (err) {
-//         console.error('Error creating table:', err)
-//     } finally {
-//         await connection.end()
-//     }
-// }
-
-// createTable()
-// showTable()
-
-
 app.post('/Login', async (req, res) => {
     const { username, password } = req.body
-    // const checkLetter = /[a-zA-Z]+$/
-    // if (!username.match(checkLetter)) {
-    //     console.log("username must contain only letters")
-    //     return res.render('login.ejs', {
-    //         message: "username must contain only letters"
-    //     });
-    // }
+
+
+    const schema = joi.object({
+        username: joi.string().alphanum().min(3).max(30).required(),
+        password: joi.string().min(8).max(30).required()
+    })
+
+    const validation = schema.validate(req.body)
+    if (validation.error) {
+        console.log(validation.error + ' error')
+        res.redirect('/Login')
+        return
+    }
+
+
     try {
         const connection = await createConnection()
         const query = `SELECT * FROM user WHERE username = ?`
-        const [result] = await connection.query(query, [username]);
+        const [result] = await connection.query(query, [username.trim()]);
         connection.end()
         if (result.length === 0) {
             console.log("This User Does Not Exist")
@@ -634,9 +642,9 @@ app.post('/Login', async (req, res) => {
         }
 
         const user = result[0];
-        // const passwordMatch = await bcrypt.compare(password, user.password)
+        const passwordMatch = await bcrypt.compare(password, user.password_hash)
 
-        const passwordMatch = (user.password_hash === password)
+        
 
         if (!passwordMatch) {
             return res.render('login.ejs', {
@@ -653,7 +661,7 @@ app.post('/Login', async (req, res) => {
         res.status(500).send('Internal Server Error')
     }
 
-})
+})  
 
 
 app.get('/Logout', (req, res) => {
@@ -670,3 +678,5 @@ app.get('*', (req, res) => {
 app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
 })
+
+

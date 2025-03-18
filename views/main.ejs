@@ -34,7 +34,7 @@
 
 
 
-                <div id="newChatModal" class="modal hidden">
+                <div id="newChatModal" class="modal hidden1">
                     <div class="modal-content text-3xl gap-3">
                         <div>
                             New Chat
@@ -79,11 +79,12 @@
                                 <span id="closemembermodal" class="close" aria-label="Close modal">&times;</span>
                             </div>
 
-                            <form action="/update-room" method="POST">
+                            <form action="/Main/updateMember" method="POST">
                                 <div class="user-list">
                                     <% users.forEach(function(user) { %>
                                         <label class="block text-lg">
-                                            <input type="checkbox" name="selectedUsers" value="<%= user.username.trim() %>" class="mr-2" <% if
+                                            <input type="checkbox" name="selectedUsers"
+                                                value="<%= user.username.trim() %>" class="mr-2" <% if
                                                 (usernames_in_room.includes(user.username)) { %>
                                             checked
                                             <% } %>
@@ -92,7 +93,8 @@
                                         </label>
                                         <% }) %>
                                 </div>
-                                <button type="submit">Update Group</button>
+
+                                <button type="submit" id="addMembers">Update Group</button>
                             </form>
 
                         </div>

@@ -86,17 +86,19 @@
         }
 
         /* Hidden state for smooth fade-in/out */
-        .hidden {
-            display: flex;
+        .hidden1 {
+            display: none;
             opacity: 0;
             pointer-events: none;
         }
 
         /* Show modal smoothly */
+        /* Show modal smoothly */
         .modal.show {
             display: flex;
             opacity: 1;
             pointer-events: auto;
+            transition: opacity 0.3s ease-in-out;
         }
 
         /* Slide-down animation effect */

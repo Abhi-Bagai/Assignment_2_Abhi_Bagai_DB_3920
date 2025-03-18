@@ -6,20 +6,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Open the modal
     newChatButton.addEventListener('click', () => {
-        newChatModal.style.display = 'flex';
+        newChatModal.classList.remove('hidden1');
+        newChatModal.classList.add('show');
     });
 
     // Close the modal
     closeModal.addEventListener('click', () => {
-        newChatModal.style.display = 'none';
+        newChatModal.classList.add('hidden1');
+        newChatModal.classList.remove('show');
     });
 
     // Close modal on background click
     window.addEventListener('click', (event) => {
         if (event.target === newChatModal) {
-            newChatModal.style.display = 'none';
+            newChatModal.classList.add('hidden1');
+            newChatModal.classList.remove('show');
         }
     });
+
 
     // Handle creating a new chat
     createChatButton.addEventListener('click', async (event) => {
@@ -42,7 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (response.ok) {
                 console.log('Chat room created:', result.message);
-                newChatModal.style.display = 'none';
+                newChatModal.classList.add('hidden1');
+                newChatModal.classList.remove('show');
+                location.reload(); // Refresh to show the new chat
                 location.reload(); // Refresh to show the new chat
             } else {
                 console.error('Failed to create chat:', result.message);
@@ -55,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+
 document.addEventListener("DOMContentLoaded", () => {
     const addButton = document.getElementById("addButton");
     const addMemberModal = document.getElementById("addMemberModal");
@@ -107,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
         addMembers.disabled = true;
 
         try {
-            const response = await fetch("/Main/addNewMember", {
+            const response = await fetch("/Main/updateMember", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
