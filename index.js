@@ -337,7 +337,7 @@ async function getUsers() {
     return userList
 }
 
-async function checkUserInRoom(user, room_id) {
+async function checkUserInRoom(user_id, room_id) {
 
     const connection = await createConnection()
     const query = `
@@ -484,10 +484,10 @@ app.post("/Main/updateMember", async (req, res) => {
         console.log("Group Name:", groupName);
         console.log("Users:", users);
 
-        const room_id = getRoomId(groupName);
+        const room_id = await getRoomId(groupName);
         if (!room_id) {
             console.error("Group not found:", groupName);
-            return res.status(404).json({ message: "Group not found." });
+            return 
         }
 
         console.log("Room ID:", room_id);
@@ -495,21 +495,19 @@ app.post("/Main/updateMember", async (req, res) => {
         const addedUsers = [];
         const skippedUsers = [];
 
-        for (let user of users) {
-            const room_id = await getRoomId(groupName);
-            const user_id = await getUserId(user);
-            if (await checkUserInRoom(user_id, room_id)) {
-
-
-
+        users.forEach(async user => {
+            
+            const [user_id] = await getUserId(user);
+            console.log("User ID:", user_id);
+            if (await checkUserInRoom(user_id.user_id, room_id.room_id)) {
                 console.log("User already in room:", user);
                 skippedUsers.push(user);
             } else {
                 console.log("Adding user to room:", user);
-                addUserToRoom(user_id, room_id);
+                addUserToRoom(user_id.user_id, room_id.room_id);
                 addedUsers.push(user);
             }
-        }
+        })
 
         console.log("New members added:", addedUsers);
         return res.status(200).json({
@@ -654,7 +652,7 @@ app.post('/Login', async (req, res) => {
 
     const user = result[0];
     const passwordMatch = await bcrypt.compare(password, user.password_hash)
-    
+    console.log("passwordMatch:", passwordMatch)
     if (passwordMatch) {
         req.session.authenticated = true
         req.session.username = user.username
