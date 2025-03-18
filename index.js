@@ -189,6 +189,7 @@ async function newMessage(room_user_id, sendmessage) {
 }
 
 
+
 async function updatelastreadmessage(last_message, room_user_id) {
     const connection = await createConnection()
     const query = `
@@ -464,7 +465,7 @@ app.post('/Main/createNewChat', async (req, res) => {
 
     } catch (error) {
         console.error('Error creating chat room:', error.message);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        return
     }
 
 });
@@ -519,7 +520,7 @@ app.post("/Main/updateMember", async (req, res) => {
 
     } catch (error) {
         console.error("Error adding members:", error.message);
-        return res.status(500).json({ message: "Internal Server Error" });
+        return
     }
 });
 
@@ -561,14 +562,23 @@ app.post('/SignUp', async (req, res) => {
 
     const schema = joi.object({
         username: joi.string().alphanum().min(3).max(30).required(),
-        password: joi.string().min(8).max(30).required()
+        password: 
+            joi.string()
+                .min(10)  // minimum length of 10 characters
+                .pattern(/[A-Z]/, 'uppercase')  // at least one uppercase letter
+                .pattern(/[a-z]/, 'lowercase')  // at least one lowercase letter
+                .pattern(/\d/, 'digit')  // at least one digit
+                .pattern(/[\W_]/, 'special character')  // at least one special character
+                .required()  // password is requiredjoi.string().alphanum().min(10).max(30).required()
     })
 
     const validation = schema.validate(req.body)
 
     if (validation.error) {
         console.log(validation.error + ' error')
-        res.redirect('/SignUp')
+        res.render('signup.ejs', {
+            message: validation.error
+        })
         return
     }
 
@@ -613,7 +623,13 @@ app.post('/Login', async (req, res) => {
 
     const schema = joi.object({
         username: joi.string().alphanum().min(3).max(30).required(),
-        password: joi.string().min(8).max(30).required()
+        password: joi.string()
+            .min(10)  // minimum length of 10 characters
+            .pattern(/[A-Z]/, 'uppercase')  // at least one uppercase letter
+            .pattern(/[a-z]/, 'lowercase')  // at least one lowercase letter
+            .pattern(/\d/, 'digit')  // at least one digit
+            .pattern(/[\W_]/, 'special character')  // at least one special character
+            .required()  // password is required
     })
 
     const validation = schema.validate(req.body)
@@ -639,7 +655,6 @@ app.post('/Login', async (req, res) => {
     const user = result[0];
     const passwordMatch = await bcrypt.compare(password, user.password_hash)
     
-
     if (passwordMatch) {
         req.session.authenticated = true
         req.session.username = user.username
@@ -651,7 +666,6 @@ app.post('/Login', async (req, res) => {
         });
         
     }
-
 
 })  
 
