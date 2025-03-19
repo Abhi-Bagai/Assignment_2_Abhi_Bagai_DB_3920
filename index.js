@@ -215,8 +215,22 @@ async function updatelastreadmessage(last_message, room_user_id) {
 async function getUnreadMessages(user_id) {
     const connection = await createConnection()
     const query = `
-    CALL get_unread_messages(?);`
-    let [unreadMessages] = await connection.query(query, [user_id])
+    with last as (
+	select ru.room_id, ru.user_id, count(*) as unread
+    from room_user as ru
+	left join room as r using (room_id)
+	left join user as u using (user_id)
+	left join message as m using(room_user_id)
+    where m.message_id >= ru.last_read_message_id and ru.user_id = ?
+    group by ru.room_id, ru.user_id
+
+    )
+    select *
+    from last
+    join room as r using(room_id);
+    
+    `
+    const [unreadMessages] = await connection.query(query, [user_id]) || []
     return unreadMessages
 }
 
@@ -430,10 +444,17 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
 
     }
 
-    let [unreadMessages] = await getUnreadMessages(req.session.user_id)
+    user_id = req.session.user_id
+    console.log("user_id =", user_id)
+    let [unreadMessages] = await getUnreadMessages(user_id) || []
     console.log("unread mes = ", unreadMessages)
 
-    for (unread of unreadMessages) {
+
+
+    for (const unread of unreadMessages || []) {
+        if (unreadMessages.length == 0) {
+            break
+        }
         for (const room of rooms) {
             if (unread.name == room.name) {
                 room.unreadCount = unread.unread_message_count
@@ -562,7 +583,7 @@ app.post('/Main/:groupName', async (req, res) => {
 
 
 app.post('/updateEmoji', async (req, res) => {
-    const { emoji_id, message_id, groupName} = req.body;
+    const { emoji_id, message_id, groupName } = req.body;
     console.log("emoji_id:", emoji_id)
     console.log("message_id:", message_id)
     console.log("groupName:", groupName)
@@ -577,7 +598,7 @@ app.post('/updateEmoji', async (req, res) => {
         where message_id = ? and user_id = ?; 
         `
         const [result] = await connection.query(query, [message_id, user_id]) || []
-        console.log("result emoji",result.length)
+        console.log("result emoji", result.length)
 
         if (result.length > 0) {
             const query2 = `
@@ -586,22 +607,22 @@ app.post('/updateEmoji', async (req, res) => {
             WHERE message_id = ?;
             `
             await connection.query(query2, [emoji_id, message_id])
-            return
+            
         } else {
             const query3 = `
             insert into reaction(message_id, emoji_id, user_id)
             values(?,? ,? );
             `
             await
-            connection.query(query3, [message_id, emoji_id, user_id])   
+                connection.query(query3, [message_id, emoji_id, user_id])
         }
     }
-    catch (error) { 
+    catch (error) {
         console.log(error)
     }
 
     res.status(200).json({ message: "Emoji updated successfully" })
-    return
+    
 })
 
 
