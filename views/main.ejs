@@ -107,9 +107,9 @@
                 </div>
 
                 <% for (let i=0; i < messages.length; i++) { %>
-                    <div class="flex p-5">
+                    <div class="flex p-5" id="message<%= messages[i].message_id %>">
                         <% if (messages[i].username==username) { %>
-                            <div class="flex justify-end w-full">
+                            <div class="flex justify-end w-full" ">
                                 <% if (messages[i].isUnread) { %>
                                     <div class=" textboxesUnread text-align-left rounded-lg">
                                         <div class="font-bold">
@@ -119,6 +119,25 @@
                                             <div class="font-sm">
                                                 <%= messages[i].formatted_sent_datetime %>
                                             </div>
+
+                                            <div>
+                                                <% if (messages[i].emoji_id> 0) { %>
+                                                    <div id="emoji<%= messages[i].message_id %>" class="flex gap-2">
+                                                        <% if (messages[i].emoji_id==1) { %>
+                                                            <span class="material-symbols-outlined">sentiment_satisfied</span>
+                                                            <% } if (messages[i].emoji_id==2) { %>
+                                                                <span class="material-symbols-outlined">money</span>
+                                                                <% } if (messages[i].emoji_id==3) { %>
+                                                                    <span class="material-symbols-outlined">thumb_up</span>
+                                                                    <% } %>
+                                                    </div>
+                                                    <% } %>
+                                            </div>
+
+                                               
+                                            
+
+
                                     </div>
                                     <% } else { %>
                                         <div class=" textboxesRight text-align-left rounded-lg">
@@ -129,6 +148,20 @@
                                                 <div class="font-sm">
                                                     <%= messages[i].formatted_sent_datetime %>
                                                 </div>
+                                        </div>
+
+                                        <div>
+                                            <% if (messages[i].emoji_id> 0) { %>
+                                                <div id="emoji<%= messages[i].message_id %>" class="flex gap-2">
+                                                    <% if (messages[i].emoji_id==1) { %>
+                                                        <span class="material-symbols-outlined">sentiment_satisfied</span>
+                                                        <% } if (messages[i].emoji_id==2) { %>
+                                                            <span class="material-symbols-outlined">money</span>
+                                                            <% } if (messages[i].emoji_id==3) { %>
+                                                                <span class="material-symbols-outlined">thumb_up</span>
+                                                                <% } %>
+                                                </div>
+                                                <% } %>
                                         </div>
                                         <% } %>
                             </div>
@@ -158,6 +191,25 @@
 
                                             <% } %>
                     </div>
+
+
+                 
+                    
+                    
+                                      
+
+
+
+                
+                    
+                                          
+
+                    
+
+              
+
+
+
                     <% } %>
 
                         <% if (groupName !=false) { %>
@@ -181,6 +233,10 @@
         </div>
     </div>
 
+<script>
+    const messages = <%- JSON.stringify(messages) %>;
+    const groupName = <%- JSON.stringify(groupName) %>;
+</script>
 
 
 

@@ -152,14 +152,24 @@ async function getRooms(username) {
 async function getMessages(groupName) {
     const connection = await createConnection()
     const query2 = `
-    select*, DATE_FORMAT(sent_datetime, '%Y-%m-%d %H:%i:%s') AS formatted_sent_datetime
+    select*, DATE_FORMAT(sent_datetime, '%Y-%m-%d %H:%i:%s') AS formatted_sent_datetime, rx.user_id as rx_user
     from message as m
-    join room_user as ru USING(room_user_id)
-    join user as u USing(user_id)
-    join room as r using(room_id)
+    left join room_user as ru USING(room_user_id)
+    left join user as u USing(user_id)
+    left join room as r using(room_id)
+    left join reaction as rx using(message_id)
+    left join emoji as e USING(emoji_id)
     where r.name = ?
-    order by m.sent_datetime;`
+    order by m.sent_datetime;
+    `
     const [messages] = await connection.query(query2, [groupName])
+
+    for (const message of messages) {
+        if (!message.emoji_id) {
+            message.emoji_id = 0
+        }
+    }
+
     return [messages]
 }
 
@@ -378,7 +388,7 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
 
     console.log("groups: ", rooms)
     const groupName = req.params[0]
-    let [messages] = await getMessages(groupName)
+    let [messages] = await getMessages(groupName) || []
 
     let usernames_in_room = []
     if (groupName != false) {
@@ -403,6 +413,8 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
             }
 
         })
+
+        console.log("message", messages)
 
         const room_id = await getRoomId(groupName)
         console.log("room ID =", room_id)
@@ -432,10 +444,12 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
     const users = await getUsers();
     // console.log(users)
 
-    res.render('main.ejs', { rooms, groupName, messages,
+    res.render('main.ejs', {
+        rooms, groupName, messages,
         users: users,
-        usernames_in_room: usernames_in_room || []  // Ensure it's never null
-        })
+        usernames_in_room: usernames_in_room || []
+        // Ensure it's never null
+    })
 
 })
 
@@ -487,7 +501,7 @@ app.post("/Main/updateMember", async (req, res) => {
         const room_id = await getRoomId(groupName);
         if (!room_id) {
             console.error("Group not found:", groupName);
-            return 
+            return
         }
 
         console.log("Room ID:", room_id);
@@ -496,7 +510,7 @@ app.post("/Main/updateMember", async (req, res) => {
         const skippedUsers = [];
 
         users.forEach(async user => {
-            
+
             const [user_id] = await getUserId(user);
             console.log("User ID:", user_id);
             if (await checkUserInRoom(user_id.user_id, room_id.room_id)) {
@@ -547,6 +561,51 @@ app.post('/Main/:groupName', async (req, res) => {
 });
 
 
+app.post('/updateEmoji', async (req, res) => {
+    const { emoji_id, message_id, groupName} = req.body;
+    console.log("emoji_id:", emoji_id)
+    console.log("message_id:", message_id)
+    console.log("groupName:", groupName)
+
+    user_id = req.session.user_id
+
+    try {
+        const connection = await createConnection()
+        const query = `
+        Select * 
+        from reaction
+        where message_id = ? and user_id = ?; 
+        `
+        const [result] = await connection.query(query, [message_id, user_id]) || []
+        console.log("result emoji",result.length)
+
+        if (result.length > 0) {
+            const query2 = `
+            UPDATE reaction
+            SET emoji_id = ?
+            WHERE message_id = ?;
+            `
+            await connection.query(query2, [emoji_id, message_id])
+            return
+        } else {
+            const query3 = `
+            insert into reaction(message_id, emoji_id, user_id)
+            values(?,? ,? );
+            `
+            await
+            connection.query(query3, [message_id, emoji_id, user_id])   
+        }
+    }
+    catch (error) { 
+        console.log(error)
+    }
+
+    res.status(200).json({ message: "Emoji updated successfully" })
+    return
+})
+
+
+
 app.get('/SignUp', (req, res) => {
     res.render('signup.ejs', {
         message: "Please sign up"
@@ -560,7 +619,7 @@ app.post('/SignUp', async (req, res) => {
 
     const schema = joi.object({
         username: joi.string().alphanum().min(3).max(30).required(),
-        password: 
+        password:
             joi.string()
                 .min(10)  // minimum length of 10 characters
                 .pattern(/[A-Z]/, 'uppercase')  // at least one uppercase letter
@@ -580,7 +639,7 @@ app.post('/SignUp', async (req, res) => {
         return
     }
 
-  
+
 
     try {
         const connection = await createConnection();
@@ -600,9 +659,9 @@ app.post('/SignUp', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, saltRounds)
     const query = `INSERT INTO user (username, password_hash) VALUES (?, ?)`
     const connection = await createConnection();
-    const [result] = await connection.query(query, [username.trim(), hashedPassword]);
+    await connection.query(query, [username.trim(), hashedPassword]);
     res.redirect('/Login');
-    
+
 })
 
 app.get('/Login', (req, res) => {
@@ -638,7 +697,7 @@ app.post('/Login', async (req, res) => {
     }
 
 
-    
+
     const connection = await createConnection()
     const query = `SELECT * FROM user WHERE username = ?`
     const [result] = await connection.query(query, [username.trim()]);
@@ -659,13 +718,13 @@ app.post('/Login', async (req, res) => {
         req.session.user_id = user.user_id
         res.redirect('/Main/');
     } else {
-            return res.render('login.ejs', {
+        return res.render('login.ejs', {
             message: "Invalid username or password"
         });
-        
+
     }
 
-})  
+})
 
 
 app.get('/Logout', (req, res) => {

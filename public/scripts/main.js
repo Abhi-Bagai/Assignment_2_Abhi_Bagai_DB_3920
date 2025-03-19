@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', () => {
     const newChatButton = document.getElementById('newChatButton');
     const newChatModal = document.getElementById('newChatModal');
@@ -144,3 +145,32 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+    console.log(messages)
+    messages.forEach((message) => {
+        const msg = document.getElementById("message" + message.message_id);
+        msg.addEventListener('click', async () => {
+            
+            console.log("clicked")
+            message.emoji_id = (message.emoji_id + 1) % 3
+            message.emoji_id += 1
+            console.log(message.emoji_id)
+            const response = await fetch("/updateEmoji", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    emoji_id: message.emoji_id,
+                    message_id: message.message_id,
+                    groupName: groupName
+                }),
+            });
+
+            console.log(response)
+            const result = await response.json();
+            console.log(result)
+        });
+    });
+});
+
+
