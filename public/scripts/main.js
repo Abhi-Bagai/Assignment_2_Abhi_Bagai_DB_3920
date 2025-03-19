@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
         msg.addEventListener('click', async () => {
             
             console.log("clicked")
-            message.emoji_id = (message.emoji_id + 1) % 3
+            message.emoji_id = (message.emoji_id + 1) % 4
             message.emoji_id += 1
             console.log(message.emoji_id)
             const response = await fetch("/updateEmoji", {
