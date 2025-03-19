@@ -530,8 +530,7 @@ app.post("/Main/updateMember", async (req, res) => {
         const addedUsers = [];
         const skippedUsers = [];
 
-        users.forEach(async user => {
-
+        await Promise.all(users.map(async (user) => {
             const [user_id] = await getUserId(user);
             console.log("User ID:", user_id);
             if (await checkUserInRoom(user_id.user_id, room_id.room_id)) {
@@ -539,11 +538,11 @@ app.post("/Main/updateMember", async (req, res) => {
                 skippedUsers.push(user);
             } else {
                 console.log("Adding user to room:", user);
-                addUserToRoom(user_id.user_id, room_id.room_id);
+                await addUserToRoom(user_id.user_id, room_id.room_id);
                 addedUsers.push(user);
             }
-        })
-
+        }));
+        
         console.log("New members added:", addedUsers);
         return res.status(200).json({
             message: "New members added successfully",
