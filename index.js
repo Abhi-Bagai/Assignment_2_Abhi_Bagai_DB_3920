@@ -216,12 +216,12 @@ async function getUnreadMessages(user_id) {
     const connection = await createConnection()
     const query = `
     with last as (
-	select ru.room_id, ru.user_id, count(*) as unread
+	select ru.room_id, ru.user_id, count(*) as unreadCount
     from room_user as ru
 	left join room as r using (room_id)
 	left join user as u using (user_id)
 	left join message as m using(room_user_id)
-    where m.message_id >= ru.last_read_message_id and ru.user_id = ?
+    where m.message_id > ru.last_read_message_id and ru.user_id = ?
     group by ru.room_id, ru.user_id
 
     )
@@ -230,7 +230,7 @@ async function getUnreadMessages(user_id) {
     join room as r using(room_id);
     
     `
-    const [unreadMessages] = await connection.query(query, [user_id]) || []
+    const unreadMessages = await connection.query(query, [user_id]) 
     return unreadMessages
 }
 
@@ -378,15 +378,7 @@ async function checkUserInRoom(user_id, room_id) {
     return false
 }
 
-async function updateUserInRoom(user_id, room_id) {
-    const connection = await createConnection()
-    const query = `
-    INSERT INTO room_user (user_id, room_id)
-    VALUES (?, ?);
-   `
-    const [newUser] = await connection.query(query, [user_id, room_id]);
-    return newUser
-}
+
 
 
 
@@ -446,20 +438,21 @@ app.get('/Main/*', IsAuthenticated, async (req, res) => {
 
     user_id = req.session.user_id
     console.log("user_id =", user_id)
-    let [unreadMessages] = await getUnreadMessages(user_id) || []
+    let [unreadMessages] = await getUnreadMessages(user_id)
     console.log("unread mes = ", unreadMessages)
 
-
-
-    for (const unread of unreadMessages || []) {
+    
+    for (const unread of unreadMessages) {
         if (unreadMessages.length == 0) {
             break
         }
-        for (const room of rooms) {
+        rooms.forEach(room => {
             if (unread.name == room.name) {
-                room.unreadCount = unread.unread_message_count
+                room.unreadCount = unread.unreadCount
+                console.log("unread  = ", unread.unreadCount)
             }
-        }
+        })
+
     }
     console.log(rooms)
     const users = await getUsers();
@@ -542,7 +535,7 @@ app.post("/Main/updateMember", async (req, res) => {
                 addedUsers.push(user);
             }
         }));
-        
+
         console.log("New members added:", addedUsers);
         return res.status(200).json({
             message: "New members added successfully",
